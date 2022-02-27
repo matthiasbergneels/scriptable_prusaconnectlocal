@@ -2,41 +2,22 @@
 // These must be at the very top of the file. Do not edit.
 // icon-color: red; icon-glyph: microscope; share-sheet-inputs: plain-text;
 
-thin_font = Font.regularRoundedSystemFont(13);
-  
-  
-bold_font = Font.heavyRoundedSystemFont(17);
-subtext_font = Font.regularRoundedSystemFont(13);
-  
-title_font = Font.heavyRoundedSystemFont(19);
-footer_font = Font.regularRoundedSystemFont(13);
-DYNAMIC_SPACER_SIZE = null;
-  
-const STYLING = {
-	FONTS: {
-		TITLE: Font.heavyRoundedSystemFont(19),
-		FOOTER: Font.regularRoundedSystemFont(13),
+/************************************************************************
+Widget to show 3D printer details supported by Prusa Connect local API
 
-		CONTENT_TITLE_BOLD: Font.heavyRoundedSystemFont(17),
-		CONTENT: Font.regularRoundedSystemFont(13),
-		CONTENT_SMALL_BOLD: Font.heavyRoundedSystemFont(13),
-		CONTENT_HINT: Font.regularRoundedSystemFont(10)
-	},
+Setup:
+- copy widget to scriptable
+- add scriptable widget (medium size) to homescreen
+- widget config:
+	- Script: choose script
+	- When interacting (propsal): Run script
+	- Parameter: ip address to prusa printer
 
-	COLORS: {
-		PRUSA_ORANGE: new Color("#f58a42"),
-		HINT_GREY: new Color("#999999"),
-		IMAGE: Device.isUsingDarkAppearance() ? new Color("#03d3fc") : new Color("#0000ff")
-	},
+to analyse:
+- script is starting with main() after class definitions
 
-	DYNAMIC_SPACER_SIZE: null
-};
-  
-const COLORS = {
-	PRUSA_ORANGE: new Color(""),
-	HINT_GREY: new Color("#999999")
-};  
-  
+*/
+
 class PrusaPrinter{
 
 	// Constants  
@@ -48,13 +29,6 @@ class PrusaPrinter{
 		PRINTING: "PRINTING"
   	};
 
-
-
-	PRINTER_STATUS_INVALIDIP = "INVALID_IP";
-	PRINTER_STATUS_NOTAVAILABLE = "NA";
-	PRINTER_STATUS_IDLE = "IDLE";
-	PRINTER_STATUS_PRINTING = "PRINTING";
-
 	
 	// Members - Printer Data
 	commonData = {
@@ -64,12 +38,6 @@ class PrusaPrinter{
   		type: null,
   		latestUpdate: new Date()
 	};
-
-	printerIp = "";
-	printerUrl = "http://";
-	printerStatus = "";
-	printerType = null;
-	printerLatestUpdate = new Date();
 	
 	// Members - Telemetry Data general
 	rawTelemetryData = {};
@@ -77,13 +45,13 @@ class PrusaPrinter{
   		dataRetrievalDate: null,
 		temperatureNozzle: 0,
 		temperatureBed: 0,
-		material: ""
+		material: null
 		
 	}
 
 	// Members - Telemtry Data printing
 	telemetryPrinting = {
-		projectName: "",
+		projectName: null,
 		remainingTimeInSeconds: 0,
 		progressInPercentage: 0,
 		currentHeight: 0.0
@@ -91,33 +59,33 @@ class PrusaPrinter{
 
 	constructor(printerIp){	
   		if(!PrusaPrinter.isIpAddressValid(printerIp)){
-			this.printerStatus = this.PRINTER_STATUS_INVALIDIP;
-			console.log(this.printerStatus);
+			this.commonData.status = PrusaPrinter.STATUS.INVALIDIP;
+			console.log(this.commonData.status);
 			return;
   		}
 		
-		this.printerIp = printerIp;
-		this.printerUrl = this.printerUrl + printerIp;
-		console.log(this.printerIp + " " + this.printerUrl);
+		this.commonData.ip = printerIp;
+		this.commonData.url = "http://" + printerIp;
+		console.log(this.commonData.ip + " " + this.commonData.url);
 	}
 
 	async loadRemoteTelemetryData(printer){
   
-  		let request = new Request(this.printerUrl + PrusaPrinter.API_PATH);
+  		let request = new Request(this.commonData.url + PrusaPrinter.API_PATH);
 		request.timeoutInterval = 5;
 
 		try {
 			let data = await request.loadJSON();
 		
 			if(request.response && request.response.statusCode == 200){
-  				this.printerType = request.response.headers.Server;
+  				this.commonData.type = request.response.headers.Server;
   				console.log(data);
 				this.rawTelemetryData = data;
 				this.parseTelemetryRawDataAndSetPrinterStatus();
 			}
 			
 		} catch(e) {
-			this.printerStatus = this.PRINTER_STATUS_NOTAVAILABLE;
+			this.commonData.status = PrusaPrinter.STATUS.NOTAVAILABLE;
 			console.log(e);
 		}
 
@@ -134,7 +102,7 @@ class PrusaPrinter{
 
 		if(this.rawTelemetryData.project_name){
 
-			this.printerStatus = this.PRINTER_STATUS_PRINTING;			
+			this.commonData.status = PrusaPrinter.STATUS.PRINTING;			
 
 			this.telemetryPrinting = {
 				projectName: this.rawTelemetryData.project_name,
@@ -143,7 +111,7 @@ class PrusaPrinter{
 				currentHeight: parseFloat(this.rawTelemetryData.pos_z_mm)
 			};
 		} else {
-			this.printerStatus = this.PRINTER_STATUS_IDLE;
+			this.commonData.status = PrusaPrinter.STATUS.IDLE;
 		}
 	}
 
@@ -163,7 +131,7 @@ class PrusaPrinter{
 
 		console.log(new DateFormatter().string(finalPrintingTimeDate));
 		
-		return toLocal(finalPrintingTimeDate);
+		return dateToLocalizedString(finalPrintingTimeDate);
 	}
 	
 	static isIpAddressValid(inputIp){
@@ -174,26 +142,58 @@ class PrusaPrinter{
 
 class PrinterWidget{
 
+	// Constants
+	static STYLING = {
+		FONTS: {
+			HEADER: Font.heavyRoundedSystemFont(19),
+			FOOTER: Font.regularRoundedSystemFont(13),
+	
+			CONTENT_TITLE_BOLD: Font.heavyRoundedSystemFont(17),
+			CONTENT: Font.regularRoundedSystemFont(13),
+			CONTENT_BOLD: Font.heavyRoundedSystemFont(13),
+			CONTENT_HINT: Font.regularRoundedSystemFont(10)
+		},
+	
+		COLORS: {
+			PRUSA_ORANGE: new Color("#f58a42"),
+			HINT_GREY: new Color("#999999"),
+			IMAGE: Device.isUsingDarkAppearance() ? new Color("#03d3fc") : new Color("#0000ff")
+		},
+	
+		DYNAMIC_SPACER_SIZE: null
+	};
+
+	static REFRESHRATE = {
+		PRINTING: 1,
+		IDLE: 10,
+		OFFLINE: 20
+	}
+
+
+	// Members
 	widget = null;
 	printer = null;
-	headerStack = null;
-	contentStack = null;
-	footerStack = null;
 
+	stack = {
+		header: null,
+		content: null,
+		footer: null
+	}
+	
 	constructor(printer){
   		console.log("Construct Widget");
   		this.printer = printer;
 		this.widget = new ListWidget();
-		this.widget.url = printer.printerUrl;
+		this.widget.url = printer.commonData.url;
 
 
-		this.headerStack = this.widget.addStack();
-		this.widget.addSpacer(null);
-		this.contentStack = this.widget.addStack();
-		this.contentStack.layoutVertically();
-		this.widget.addSpacer(null);
-		this.footerStack = this.widget.addStack();
-		this.widget.addSpacer(null);		
+		this.stack.header = this.widget.addStack();
+		this.widget.addSpacer(PrinterWidget.STYLING.DYNAMIC_SPACER_SIZE);
+		this.stack.content = this.widget.addStack();
+		this.stack.content.layoutVertically();
+		this.widget.addSpacer(PrinterWidget.STYLING.DYNAMIC_SPACER_SIZE);
+		this.stack.footer = this.widget.addStack();
+		this.widget.addSpacer(PrinterWidget.STYLING.DYNAMIC_SPACER_SIZE);		
 
   		console.log("Fill Widget");
 		this.fillHeader();
@@ -205,76 +205,77 @@ class PrinterWidget{
 
 	fillHeader(){
   		let headerText = "Prusa Connect local" 
-  		+ (this.printer.printerType ? " - " + this.printer.printerType : "");
-		let headerTextWidget = this.headerStack.addText(headerText);
-		headerTextWidget.font = title_font;
+  		+ (this.printer.commonData.type ? " - " + this.printer.commonData.type : "");
+		let headerTextWidget = this.stack.header.addText(headerText);
+		headerTextWidget.font = PrinterWidget.STYLING.FONTS.HEADER;
 		headerTextWidget.textColor = new Color('#f58a42');
 	}
 
 
 	fillContent(){
   
-  		console.log(this.printer.printerStatus);
+  		console.log(this.printer.commonData.status);
   
-  		if(this.printer.printerStatus 
-  					=== this.printer.PRINTER_STATUS_INVALIDIP){
+  		if(this.printer.commonData.status 
+  					=== PrusaPrinter.STATUS.INVALIDIP){
 
-			this.setWidgetRefreshTimeInMinutes(30);	
+			this.setWidgetRefreshTimeInMinutes(PrinterWidget.REFRESHRATE.OFFLINE);	
 
   			let ipAddressInvalidText = "Invalid IP address";
   			let offlineExplanationText = "provide IP address as Parameter";
 
-  			let ipAddressInvalidTextWidget = this.contentStack.addText(ipAddressInvalidText);
-  			let offlineExplanationTextWidget = this.contentStack.addText(offlineExplanationText);
+  			let ipAddressInvalidTextWidget = this.stack.content.addText(ipAddressInvalidText);
+  			let offlineExplanationTextWidget = this.stack.content.addText(offlineExplanationText);
   	
-  			ipAddressInvalidTextWidget.font = STYLING.FONTS.CONTENT_BOLD;
-  			offlineExplanationTextWidget.font = STYLING.FONTS.CONTENT_HINT;
-  			offlineExplanationTextWidget.textColor = STYLING.COLORS.HINT_GREY;
+  			ipAddressInvalidTextWidget.font = PrinterWidget.STYLING.FONTS.CONTENT_BOLD;
+  			offlineExplanationTextWidget.font = PrinterWidget.STYLING.FONTS.CONTENT_HINT;
+  			offlineExplanationTextWidget.textColor = PrinterWidget.STYLING.COLORS.HINT_GREY;
   
   			
-  		} else if(this.printer.printerStatus 
-  					=== this.printer.PRINTER_STATUS_NOTAVAILABLE){
+  		} else if(this.printer.commonData.status 
+  					=== PrusaPrinter.STATUS.NOTAVAILABLE){
 
-			this.setWidgetRefreshTimeInMinutes(30);	
+			this.setWidgetRefreshTimeInMinutes(PrinterWidget.REFRESHRATE.OFFLINE);	
 
   			let printerNotAvailableText = "Printer is OFFLINE";
   			let offlineExplanationText = "turn on printer, check for local network or check IP address";
 
-  			let printerNotAvailableTextWidget = this.contentStack.addText(printerNotAvailableText);
-  			let offlineExplanationTextWidget = this.contentStack.addText(offlineExplanationText);
+  			let printerNotAvailableTextWidget = this.stack.content.addText(printerNotAvailableText);
+  			let offlineExplanationTextWidget = this.stack.content.addText(offlineExplanationText);
   	
-  			printerNotAvailableTextWidget.font = STYLING.FONTS.CONTENT_BOLD;
-  			offlineExplanationTextWidget.font = STYLING.FONTS.CONTENT_HINT;
-  			offlineExplanationTextWidget.textColor = STYLING.COLORS.HINT_GREY;  			
-  		} else if(this.printer.printerStatus === this.printer.PRINTER_STATUS_IDLE){
+  			printerNotAvailableTextWidget.font = PrinterWidget.STYLING.FONTS.CONTENT_BOLD;
+  			offlineExplanationTextWidget.font = PrinterWidget.STYLING.FONTS.CONTENT_HINT;
+  			offlineExplanationTextWidget.textColor = PrinterWidget.STYLING.COLORS.HINT_GREY;  		
+
+  		} else if(this.printer.commonData.status === PrusaPrinter.STATUS.IDLE){
     		
-    		this.setWidgetRefreshTimeInMinutes(10);
+    		this.setWidgetRefreshTimeInMinutes(PrinterWidget.REFRESHRATE.IDLE);
     
-    		this.contentStack.layoutVertically();
+    		this.stack.content.layoutVertically();
 
   			let printerIdleText = "Printer is IDLE";
-  			let printerIdleTextWidget = this.contentStack.addText(printerIdleText);
-  			printerIdleTextWidget.font = STYLING.FONTS.CONTENT_BOLD;
+  			let printerIdleTextWidget = this.stack.content.addText(printerIdleText);
+  			printerIdleTextWidget.font = PrinterWidget.STYLING.FONTS.CONTENT_BOLD;
   			
     		
-    		this.addingTemperatureAndMaterialText(this.contentStack);		
+    		this.addingTemperatureAndMaterialText(this.stack.content);		
     
-    	} else if(this.printer.printerStatus === this.printer.PRINTER_STATUS_PRINTING){
+    	} else if(this.printer.commonData.status === PrusaPrinter.STATUS.PRINTING){
 			
-			this.setWidgetRefreshTimeInMinutes(1);			
-			this.contentStack.layoutVertically();
+			this.setWidgetRefreshTimeInMinutes(PrinterWidget.REFRESHRATE.OFFLINE.PRINTING);			
+			this.stack.content.layoutVertically();
 
   			let printingTitleText = "Printing: " 
   					+ this.printer.telemetryPrinting.projectName.substr(0,20) + "...";
-			let printingTitleTextWidget = this.contentStack.addText(printingTitleText);
-  			printingTitleTextWidget.font = STYLING.FONTS.CONTENT_BOLD;
+			let printingTitleTextWidget = this.stack.content.addText(printingTitleText);
+  			printingTitleTextWidget.font = PrinterWidget.STYLING.FONTS.CONTENT_BOLD;
   			
-  			this.contentStack.addSpacer(null);
+  			this.stack.content.addSpacer(PrinterWidget.STYLING.DYNAMIC_SPACER_SIZE);
   
-  			let detailStack = this.contentStack.addStack();
+  			let detailStack = this.stack.content.addStack();
   			
   			let pictureStack = detailStack.addStack();
-  			detailStack.addSpacer(null);
+  			detailStack.addSpacer(PrinterWidget.STYLING.DYNAMIC_SPACER_SIZE);
   			let printingStateStack = detailStack.addStack();
   			printingStateStack.layoutVertically();
   
@@ -288,20 +289,20 @@ class PrinterWidget{
   				+ this.printer.telemetryPrinting.currentHeight + " mm"
 
 			let printingProgressTextWidget = printingStateStack.addText(printingProgressText);
-			printingProgressTextWidget.font = STYLING.FONTS.CONTENT;
+			printingProgressTextWidget.font = PrinterWidget.STYLING.FONTS.CONTENT;
       		this.addingTemperatureAndMaterialText(printingStateStack);
       
           	let estimatedFinishText = "Est. Finish: " + this.printer.printingEndTimestampAsString();
 			let estimatedFinishTextWidget = printingStateStack.addText(estimatedFinishText);
-			estimatedFinishTextWidget.font = STYLING.FONTS.CONTENT_SMALL_BOLD;    
+			estimatedFinishTextWidget.font = PrinterWidget.STYLING.FONTS.CONTENT_BOLD;    
   		}
 		
 	}
 	
 	fillFooter(){
-		let footerText = "Last updated: " + toLocal(this.printer.commonData.latestUpdate);
-		let footerTextWidget = this.footerStack.addText(footerText);
-		footerTextWidget.font = footer_font;	
+		let footerText = "Last updated: " + dateToLocalizedString(this.printer.commonData.latestUpdate);
+		let footerTextWidget = this.stack.footer.addText(footerText);
+		footerTextWidget.font = PrinterWidget.STYLING.FONTS.FOOTER;	
 	}
 
 	addingTemperatureAndMaterialText(stack){
@@ -310,7 +311,7 @@ class PrinterWidget{
 			+ this.printer.telemetryGeneral.temperatureBed + "° - Material: " 
 			+ this.printer.telemetryGeneral.material;
 		let tempAndMaterialTextWidget = stack.addText(tempAndMaterialText);
-		tempAndMaterialTextWidget.font = STYLING.FONTS.CONTENT;
+		tempAndMaterialTextWidget.font = PrinterWidget.STYLING.FONTS.CONTENT;
 	}
 
 	setWidgetRefreshTimeInMinutes(minutes){
@@ -324,26 +325,24 @@ class PrinterWidget{
 }
 
 
+// start script
 main();
 
 
 async function main(){
   
   	let widgetInputRAW = args.widgetParameter;
-	let printerIP = null;
-	let printerApiUrl = "";
-
 
 	if (widgetInputRAW == null) {
   		widgetInputRAW = "192.168.178.42";
 	}
   
-	printerIp = widgetInputRAW.toString();
+	let printerIp = widgetInputRAW.toString();
 
 
 	let printer = new PrusaPrinter(printerIp);
 
-	if(!printer.printerStatus){
+	if(!printer.commonData.status){
 		await printer.loadRemoteTelemetryData();
 	}
 
@@ -354,7 +353,7 @@ async function main(){
 
 }
 
-function toLocal(date) {
+function dateToLocalizedString(date) {
   console.log(date);
   var local = new Date(date);
   console.log(local);
@@ -368,28 +367,28 @@ function toLocal(date) {
 function generatedProgressPie(progressInPercentage, width){
 
 	const OFFSET = 1;
+	const STROKE_STRENGTH = 15;
 
 	let drawingCanvas = new DrawContext();
+
+	// transparency for Darkmode
 	drawingCanvas.opaque = false;
 
 	drawingCanvas.size = new Size(width, width);
 
-	drawingCanvas.setLineWidth(15);
-	drawingCanvas.setStrokeColor(STYLING.COLORS.IMAGE);
-	drawingCanvas.setFillColor(STYLING.COLORS.IMAGE);
+	drawingCanvas.setLineWidth(STROKE_STRENGTH);
+	drawingCanvas.setStrokeColor(PrinterWidget.STYLING.COLORS.IMAGE);
+	drawingCanvas.setFillColor(PrinterWidget.STYLING.COLORS.IMAGE);
 
-	
 	let rectangleOutline = new Rect(0 + OFFSET, 0 + OFFSET, drawingCanvas.size.width - OFFSET, drawingCanvas.size.height - OFFSET);
 	drawingCanvas.strokeEllipse(rectangleOutline);
 	
-
 	let partialCirclePathPoints = generatePointsOnCircleForAngle(Math.floor(drawingCanvas.size.width / 2), Math.floor(drawingCanvas.size.height / 2), Math.floor(rectangleOutline.size.width / 2), Math.round(360 / 100 * progressInPercentage));	
 
 	let partialCirclePath = new Path();
 	partialCirclePath.addLines(partialCirclePathPoints);
 	drawingCanvas.addPath(partialCirclePath);
 	drawingCanvas.fillPath();
-
 
 	return drawingCanvas.getImage();
 }
