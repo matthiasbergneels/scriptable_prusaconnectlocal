@@ -1,7 +1,3 @@
-// Variables used by Scriptable.
-// These must be at the very top of the file. Do not edit.
-// icon-color: red; icon-glyph: microscope; share-sheet-inputs: plain-text;
-
 /************************************************************************
 Widget to show 3D printer details supported by Prusa Connect local API
 
@@ -10,7 +6,7 @@ Setup:
 - add scriptable widget (medium size) to homescreen
 - widget config:
 	- Script: choose script
-	- When interacting (propsal): Run script
+	- When interacting (propsal): Run Script
 	- Parameter: ip address to prusa printer
 
 to analyse:
@@ -332,12 +328,8 @@ main();
 async function main(){
   
   	let widgetInputRAW = args.widgetParameter;
-
-	if (widgetInputRAW == null) {
-  		widgetInputRAW = "192.168.178.42";
-	}
-  
-	let printerIp = widgetInputRAW.toString();
+	    
+	let printerIp = widgetInputRaw ? widgetInputRAW.toString() : "";
 
 
 	let printer = new PrusaPrinter(printerIp);
