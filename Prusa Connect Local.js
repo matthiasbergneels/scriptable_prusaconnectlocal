@@ -6,7 +6,7 @@ Setup:
 - add scriptable widget (medium size) to homescreen
 - widget config:
 	- Script: choose script
-	- When interacting (propsal): Run Script
+	- When interacting: Run Script
 	- Parameter: ip address to prusa printer
 
 to analyse:
@@ -328,7 +328,7 @@ main();
 async function main(){
   
   	let widgetInputRAW = args.widgetParameter;
-	    
+	  
 	let printerIp = widgetInputRaw ? widgetInputRAW.toString() : "";
 
 
