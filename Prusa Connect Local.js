@@ -1,6 +1,8 @@
 /************************************************************************
 Widget to show 3D printer details supported by Prusa Connect local API
 
+Requires: https://apps.apple.com/us/app/scriptable/id1405459188
+
 Setup:
 - copy widget to scriptable
 - add scriptable widget (medium size) to homescreen
@@ -14,10 +16,15 @@ to analyse:
 
 */
 
+// use this constant for hard coded IP or test purposes
+const DEFAULT_PRINTER_IP = "";
+
+
 class PrusaPrinter{
 
 	// Constants  
-	static API_PATH = "/api/telemetry";
+	static API_PATH = "/api/telemetry";  
+    static SECONDS_OF_ONE_DAY = 60 * 60 * 24;
   	static STATUS = {
   		INVALIDIP: "INVALID_IP",
 		NOTAVAILABLE: "NA",
@@ -112,9 +119,14 @@ class PrusaPrinter{
 	}
 
 	remainingPrintingTimeAsString(){
-		var remainingPrintTimeDate = new Date(0);
+				var remainingPrintTimeDate = new Date(0);
 		remainingPrintTimeDate.setSeconds(this.telemetryPrinting.remainingTimeInSeconds);
-		return remainingPrintTimeDate.toISOString().substr(11, 5);
+
+		if(this.telemetryPrinting.remainingTimeInSeconds > PrusaPrinter.SECONDS_OF_ONE_DAY){
+			return (remainingPrintTimeDate.getDate() - 1) + "d " + remainingPrintTimeDate.getHours() + "h";
+		} else {
+			return remainingPrintTimeDate.getHours() + "h " + remainingPrintTimeDate.getMinutes() + "m";
+		}
 	}
 
 	printingEndTimestampAsString(){
@@ -281,7 +293,7 @@ class PrinterWidget{
   
   			let printingProgressText = 
   				+ this.printer.telemetryPrinting.progressInPercentage + " % - remain: " 
-  				+ this.printer.remainingPrintingTimeAsString() + " h - Height: " 
+  				+ this.printer.remainingPrintingTimeAsString() + " - Height: " 
   				+ this.printer.telemetryPrinting.currentHeight + " mm"
 
 			let printingProgressTextWidget = printingStateStack.addText(printingProgressText);
@@ -326,11 +338,13 @@ main();
 
 
 async function main(){
-  
   	let widgetInputRAW = args.widgetParameter;
-	  
-	let printerIp = widgetInputRaw ? widgetInputRAW.toString() : "";
+  
+	if (widgetInputRAW == null) {
+  		widgetInputRAW = DEFAULT_PRINTER_IP;
+	}
 
+	let printerIp = widgetInputRAW.toString();
 
 	let printer = new PrusaPrinter(printerIp);
 
